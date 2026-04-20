@@ -4,7 +4,7 @@
 - **踩坑点**：对大文件使用`cat`会刷屏，应用`less`替代
 - **底层发生了什么**：调用`open()`打开文件，`read()`读取内容，`write()`写入标准输出
 - **C语言联动**：
-  ```c
+  
   #include <stdio.h>
   int main(int argc, char *argv[]) {
       FILE *fp = fopen(argv[1], "r");
@@ -15,7 +15,7 @@
       fclose(fp);
       return 0;
   }
-```
+
 
 编译运行：gcc -o mycat mycat.c && ./mycat /etc/hosts
 
