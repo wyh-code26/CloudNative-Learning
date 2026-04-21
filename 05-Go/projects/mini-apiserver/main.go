@@ -92,5 +92,5 @@ func main() {
 	fmt.Println("  GET  /api/v1/pods  - list all pods")
 	fmt.Println("  POST /api/v1/pods  - create a pod")
 	fmt.Println("  GET  /healthz      - health check")
-	http.ListenAndServe(":8081", nil)
+	http.ListenAndServe("0.0.0.0:8081", nil)
 }
