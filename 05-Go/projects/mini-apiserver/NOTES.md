@@ -1,6 +1,5 @@
-**今日主题**：复盘 `mini-apiserver` 项目开发过程。
+复盘 `mini-apiserver` 项目开发过程。
 
-**写作框架**：
 ```markdown
 # mini-apiserver 开发复盘
 

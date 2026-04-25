@@ -35,27 +35,7 @@ curl http://localhost:8081/healthz
  
 架构设计
  
-本项目模拟了 Kubernetes API Server 的核心设计模式：
- 
-```mermaid
-graph TD
-    subgraph "客户端层"
-        A[curl / Web 客户端]
-    end
-    
-    subgraph "接入层"
-        B[Nginx 反向代理<br/>HTTPS 终端]
-    end
-    
-    subgraph "应用层"
-        C[mini-apiserver<br/>Go HTTP 服务]
-        D[PodStore<br/>内存存储 + 读写锁]
-    end
-    
-    A -->|HTTPS 请求| B
-    B -->|proxy_pass| C
-    C -->|读写操作| D
-    ```
+05-Go/projects/mini-apiserver/3ebb7618a3b4832cbb05473fdce9ec6f.jpg
  
  
 设计映射：
