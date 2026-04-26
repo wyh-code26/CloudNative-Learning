@@ -11,7 +11,6 @@ import (
 type Pod struct {
 	Name      string `json:"name"`
 	Namespace string `json:"namespace"`
-        Image     string `json:"image"`
 	Status    string `json:"status"`
 }
 
@@ -89,15 +88,6 @@ func (s *PodStore) createPod(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-        // 参数校验：image 必填
-        if pod.Image == "" {
-        	w.Header().Set("Content-Type", "application/json")
-        	w.WriteHeader(http.StatusBadRequest)
-        	json.NewEncoder(w).Encode(map[string]string{
-        		"error": "'image' is required",
- 	})
-	return
-       }
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
