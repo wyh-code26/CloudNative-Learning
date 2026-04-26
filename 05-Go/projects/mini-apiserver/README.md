@@ -1,193 +1,145 @@
-markdown
-  
+```markdown
 # Mini API Server (K8s Style)
 
 ## 项目简介
-这是一个用 Go 语言实现的轻量级 Kubernetes API Server 模拟服务，实现了 Pod 资源的 CRUD 操作和健康检查接口，旨在深入理解 K8s 控制平面的工作原理。
-本服务为纯API后端服务，无前端页面，已完成生产级部署，核心接口可通过公网HTTPS正常访问。
+这是一个用 Go 语言实现的轻量级 Kubernetes API Server 模拟服务。它严格遵循 K8s 声明式 API 设计，实现了 Pod 资源的完整生命周期管理（增删改查）、参数校验和健康检查，旨在深入理解 K8s 控制平面的核心工作原理。
+本服务为纯 API 后端，已通过二进制文件直接在阿里云 ECS 上完成生产级部署，核心接口通过公网 HTTPS 稳定运行。
 
-## 访问地址
-- HTTPS: `https://api.wuyuhangcn.com`
-- HTTP: `http://api.wuyuhangcn.com`（自动重定向到 HTTPS）
-> 说明：域名根路径无前端页面，直接访问会返回解析提示，核心业务接口均正常可用
+## 快速访问
+- **健康检查**: `https://api.wuyuhangcn.com/healthz`
+- **API 端点**: `https://api.wuyuhangcn.com/api/v1/pods`
+- HTTP 流量 (80) 自动重定向到 HTTPS (443)
 
 ## 技术栈
-- 后端语言：Go 1.21
-- 部署方式：二进制直接运行 / Docker 容器化
-- 反向代理：Nginx
-- HTTPS 证书：Let's Encrypt (certbot，已配置自动续期)
-- 服务器环境：Ubuntu 24.04 LTS 阿里云ECS
+- **后端语言**：Go 1.22
+- **部署方式**：裸机二进制直接运行 (`nohup` 守护)
+- **反向代理**：Nginx (负责 HTTPS 终结与反向代理)
+- **安全证书**：Let's Encrypt (全自动申请与续期)
+- **运行环境**：Ubuntu 24.04 LTS on Alibaba Cloud ECS
 
 ## 核心接口
-| 方法 | 路径 | 功能 |
-| :--- | :--- | :--- |
-| GET | `/healthz` | 服务健康检查 |
-| GET | `/api/v1/pods` | 获取所有 Pod 列表 |
-| POST | `/api/v1/pods` | 创建新的 Pod |
+| 方法 | 路径 | 功能 | 业务校验 |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/healthz` | 服务健康检查 | 无 |
+| `GET` | `/api/v1/pods` | 列出所有 Pod | 无 |
+| `POST` | `/api/v1/pods` | 创建一个 Pod | 需提供 `name`、`namespace` |
+| `DELETE` | `/api/v1/pods?name=...&namespace=...` | 删除指定 Pod | 需提供 `name`、`namespace` |
 
-## 本地运行
+## 综合演示（推荐脚本）
+此脚本展示了服务从空状态到完整闭环的验证逻辑，建议直接复制到终端运行。
 ```bash
-# 启动服务
-go run main.go
-# 验证健康检查接口
-curl http://localhost:8081/healthz
- 
- 
-架构设计
- 
-05-Go/projects/mini-apiserver/3ebb7618a3b4832cbb05473fdce9ec6f.jpg
- 
- 
-设计映射：
- 
-- PodStore + map → 对应 K8s 的 etcd，负责状态存储
-- handlePods 路由分发 → 对应 K8s API Server 路由层
-- sync.RWMutex → 实现高并发读写安全，读多写少场景性能更优
--  /healthz  健康检查 → 无状态设计，支持水平扩展
-- Nginx 反向代理 → 接入层与业务层解耦，实现负载均衡
- 
-部署指南
- 
-Docker 部署
- 
-bash
-  
-# 1. 构建镜像
-docker build -t mini-apiserver .
+# 1. 健康检查
+curl -i https://api.wuyuhangcn.com/healthz
 
-# 2. 运行容器
-docker run -d --name mini-apiserver -p 8081:8081 mini-apiserver
+# 2. 查询初始状态（预期为空数组）
+curl -i https://api.wuyuhangcn.com/api/v1/pods
 
-# 3. 验证服务
-curl http://localhost:8081/healthz
- 
- 
-生产环境部署（阿里云 + Nginx + HTTPS）
- 
-bash
-  
-# 1. 交叉编译Linux环境二进制文件
-GOOS=linux GOARCH=amd64 go build -o mini-apiserver main.go
-# 2. 上传二进制到云服务器
-scp -i ~/.ssh/...... mini-apiserver root@8.210.229.103:/opt/
-
-# 3. 服务器后台启动服务
-ssh -i ~/.ssh/...... root@8.210.229.103
-nohup /opt/mini-apiserver > /var/log/mini-apiserver.log 2>&1 &
-
-# 4. Nginx 反向代理配置
-# 见项目根目录 nginx.conf 示例
- 
- 
-API 使用示例
- 
-健康检查
- 
-bash
-  
-curl https://api.wuyuhangcn.com/healthz
-# 响应: ok
- 
- 
- 创建一个 Pod
- 
-bash
-  
-curl -X POST https://api.wuyuhangcn.com/api/v1/pods \
+# 3. 创建一个 Pod
+curl -i -X POST https://api.wuyuhangcn.com/api/v1/pods \
   -H "Content-Type: application/json" \
-  -d '{"name":"nginx","namespace":"default"}'
-# 响应: {"name":"nginx","namespace":"default","status":"Running"}
+  -d '{"name":"demo-pod","image":"nginx:alpine","namespace":"default"}'
 
+# 4. 再次查询（验证创建成功）
+curl -i https://api.wuyuhangcn.com/api/v1/pods
 
-列出所有 Pod
- 
-bash
-  
-curl https://api.wuyuhangcn.com/api/v1/pods
-# 响应: [{"name":"test-pod","namespace":"","status":"Running"}]
- 
- 
+# 5. 异常演示（参数缺失，触发 400 校验）
+curl -i -X POST https://api.wuyuhangcn.com/api/v1/pods \
+  -H "Content-Type: application/json" \
+  -d '{"namespace":"test"}'
 
- 
- 
-技术亮点与学习笔记
- 
-1. 并发安全设计
- 
-go
-  
+# 6. 删除 Pod
+curl -i -X DELETE "https://api.wuyuhangcn.com/api/v1/pods?name=demo-pod&namespace=default"
+```
+
+本地开发与运行
+
+```bash
+# 1. 启动服务
+go run main.go
+
+# 2. 验证
+curl http://localhost:8081/healthz
+```
+
+生产环境部署（二进制部署）
+
+本项目最新版采用裸机二进制部署，流程如下：
+
+1. 编译:
+   ```bash
+   CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o mini-apiserver main.go
+   ```
+2. 上传:
+   ```bash
+   scp -i ~/.ssh/你的密钥 ./mini-apiserver root@你的服务器IP:/tmp/
+   ```
+3. 上线:
+   ```bash
+   ssh -i ~/.ssh/你的密钥 root@你的服务器IP
+   cp /root/mini-apiserver /root/mini-apiserver.bak  # 备份旧版
+   pkill -f mini-apiserver
+   cp /tmp/mini-apiserver /root/mini-apiserver
+   nohup /root/mini-apiserver > /var/log/mini-apiserver.log 2>&1 &
+   ```
+
+注：项目初期也使用过 Docker 多阶段构建，详见旧版提交记录。
+
+架构设计
+
+![alt text](83fa7823d26f06134e3db063d53c118e.jpg)
+
+设计映射：
+
+· PodStore + map[string]Pod: 模拟 K8s 的 etcd，作为内存态数据存储。
+· handlePods 路由分发: 模拟 K8s API Server 的路由层，根据 HTTP Method 分发。
+· sync.RWMutex: 实现高并发读写安全，契合“读多写少”场景。
+· /healthz: 无状态健康检查，是集群判断服务存活的标准接口。
+
+技术亮点
+
+1. 并发安全的内存存储
+
+```go
 type PodStore struct {
-    mu   sync.RWMutex  // 读写锁
+    mu   sync.RWMutex  // 读写锁，读并发，写安全
     pods map[string]Pod
 }
- 
- 
-- 读操作使用 RLock()，支持高并发读取
-- 写操作使用 Lock()，保证数据一致性
-- 读多写少场景下性能远优于普通互斥锁
- 
-2. RESTful API 设计
- 
-go
-  
-func (s *PodStore) handlePods(w http.ResponseWriter, r *http.Request) {
-    switch r.Method {
-    case "GET":  s.listPods(w, r)
-    case "POST": s.createPod(w, r)
-    }
+func (s *PodStore) listPods(w http.ResponseWriter, _ *http.Request) {
+    s.mu.RLock()         // 读锁
+    defer s.mu.RUnlock()
+    // ...
 }
- 
- 
-- 基于 HTTP 方法实现资源操作分发
-- 结构清晰，易于扩展更多资源类型（Deployment、Service 等）
- 
-3. 无状态设计
- 
--  /healthz  无状态、无依赖，便于监控与扩容
-- 与 K8s 原生 API Server 设计思想一致：业务无状态，状态下沉到存储
- 
-4. 容器化与多阶段构建
- 
-dockerfile
-  
-FROM golang:1.21-alpine AS builder
-WORKDIR /app
-COPY . .
-RUN go build -o mini-apiserver main.go
+```
 
-FROM alpine:latest
-WORKDIR /app
-COPY --from=builder /app/mini-apiserver .
-EXPOSE 8081
-CMD ["./mini-apiserver"]
- 
- 
-- 构建与运行分离，大幅减小镜像体积
-- 最终镜像仅包含二进制，安全、轻量、启动快
- 
-5. 生产级部署能力
- 
-- Nginx 负责 HTTPS 终端、请求转发与日志
-- Let's Encrypt 证书自动续期，保证服务长期可用
-- 后台守护运行，支持服务持久化稳定运行
-- 全链路日志可追溯，便于问题排查
- 
+2. 严谨的 RESTful 规范
 
-+----------------------+------------------------------------+-------------------------------------+----------------------------+
-|      待改进项        |           当前实现                 |           改进方向                  |      K8s 对应方案          |
-+----------------------+------------------------------------+-------------------------------------+----------------------------+
-| 状态存储             | 内存 map，服务重启数据丢失         | 引入持久化存储（BoltDB/SQLite）     | etcd                       |
-| (服务重启数据丢失)   |                                    |                                     |                            |
-+----------------------+------------------------------------+-------------------------------------+----------------------------+
-| 水平扩展             | 内存状态不共享，无法多实例扩容     | 引入外部共享存储                    | etcd + Watch 机制          |
-| (无法多实例扩容)     |                                    |                                     |                            |
-+----------------------+------------------------------------+-------------------------------------+----------------------------+
-| 认证授权             | 无身份认证与权限控制               | 添加 JWT / RBAC 权限控制            | RBAC + Admission Control   |
-| (无身份认证与权限控制)|                                    |                                     |                            |
-+----------------------+------------------------------------+-------------------------------------+----------------------------+
-| 资源版本             | 无资源版本控制                   | 增加 ResourceVersion 版本机制       | etcd ModRevision           |
-| (无资源版本控制)     |                                    |                                     |                            |
-+----------------------+------------------------------------+-------------------------------------+----------------------------+
-| Watch 机制           | 无事件推送能力                   | 实现长连接 / SSE 事件推送           | etcd Watch                 |
-| (无事件推送能力)     |                                    |                                     |                            |
-+----------------------+------------------------------------+-------------------------------------+----------------------------+
+· 状态码严格区分:
+  · 200 OK: 查询成功
+  · 201 Created: 创建成功
+  · 400 Bad Request: 参数校验失败
+  · 404 Not Found: 删除或查询不存在的资源
+  · 409 Conflict: 创建重复资源
+· 参数显式校验: 强制要求必填字段 (name、namespace)，模仿 K8s 的准入控制。
+
+3. 无状态设计思想
+
+· /healthz 不依赖任何外部存储或复杂逻辑，仅返回服务进程存活状态。
+· 符合云原生单体服务设计，便于监控告警和弹性扩缩。
+
+演进方向与 K8s 映射
+
++--------------------+---------------------------------------+---------------------------------------+
+| 演进方向          | 当前实现                              | K8s 对应方案                          |
++====================+=======================================+=======================================+
+| 状态持久化        | 内存 map，服务重启数据丢失           | etcd (持久化存储)                     |
++--------------------+---------------------------------------+---------------------------------------+
+| 资源控制          | 纯 API 资源管理 (当前已具备)         | API Server + Scheduler + Kubelet      |
++--------------------+---------------------------------------+---------------------------------------+
+| 认证授权          | 无（当前为演示环境）                  | RBAC + Admission Control              |
++--------------------+---------------------------------------+---------------------------------------+
+| 资源版本控制      | 无                                    | etcd ModRevision (乐观锁)             |
++--------------------+---------------------------------------+---------------------------------------+
+| 事件推送          | 无                                    | etcd Watch 机制                       |
++--------------------+---------------------------------------+---------------------------------------+
+
+```
