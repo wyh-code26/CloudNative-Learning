@@ -71,18 +71,17 @@ curl http://localhost:8081/healthz
    ```
 2. 上传:
    ```bash
-   scp -i ~/.ssh/你的密钥 ./mini-apiserver root@你的服务器IP:/tmp/
+   scp -i ~/.ssh/我的密钥 ./mini-apiserver root@你的服务器IP:/tmp/
    ```
 3. 上线:
    ```bash
-   ssh -i ~/.ssh/你的密钥 root@你的服务器IP
+   ssh -i ~/.ssh/我的密钥 root@你的服务器IP
    cp /root/mini-apiserver /root/mini-apiserver.bak  # 备份旧版
    pkill -f mini-apiserver
    cp /tmp/mini-apiserver /root/mini-apiserver
    nohup /root/mini-apiserver > /var/log/mini-apiserver.log 2>&1 &
    ```
 
-注：项目初期也使用过 Docker 多阶段构建，详见旧版提交记录。
 
 架构设计
 
